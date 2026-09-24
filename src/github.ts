@@ -1,4 +1,5 @@
-// Cliente GitHub (Tarefa 3): busca de perfil via /users/:username e classificação de erros (CA-8, CA-9).
+// Cliente GitHub (Tarefas 3-4): busca de perfil via /users/:username, classificação de erros (CA-8, CA-9)
+// e paginação de /users/:username/repos seguindo Link rel="next" (CA-2).
 export type GithubAccountType = 'User' | 'Organization';
 
 export interface GithubProfile {
@@ -114,4 +115,129 @@ export async function fetchGithubUser(
   }
 
   return { login: body.login, type: body.type };
+}
+
+export interface GithubRepo {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string;
+  html_url: string;
+  fork: boolean;
+  private: boolean;
+}
+
+const GITHUB_API_HOSTNAME = new URL(GITHUB_API_BASE_URL).hostname;
+
+function isGithubRepo(item: unknown): item is GithubRepo {
+  if (typeof item !== 'object' || item === null) {
+    return false;
+  }
+  const record = item as Record<string, unknown>;
+  return (
+    typeof record.id === 'number' &&
+    typeof record.name === 'string' &&
+    (typeof record.description === 'string' || record.description === null) &&
+    typeof record.created_at === 'string' &&
+    typeof record.html_url === 'string' &&
+    typeof record.fork === 'boolean' &&
+    typeof record.private === 'boolean'
+  );
+}
+
+function isGithubRepoArray(body: unknown): body is GithubRepo[] {
+  return Array.isArray(body) && body.every(isGithubRepo);
+}
+
+const NUMERIC_USER_REPOS_PATH = /^\/user\/(\d+)\/repos$/;
+
+interface NextLink {
+  url: string;
+  numericUserId: string | null;
+}
+
+function parseNextLinkUrl(linkHeader: string | null, username: string, lockedNumericUserId: string | null): NextLink | null {
+  if (!linkHeader) {
+    return null;
+  }
+
+  const expectedLegacyPath = `/users/${username}/repos`;
+
+  for (const part of linkHeader.split(',')) {
+    const match = part.trim().match(/^<([^>]+)>;\s*rel="([^"]+)"$/);
+    if (!match || match[2] !== 'next') {
+      continue;
+    }
+
+    const rawUrl = match[1];
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(rawUrl);
+    } catch {
+      throw new GithubClientError('GITHUB_UNAVAILABLE', 'Link de paginação inválido na resposta do GitHub.');
+    }
+
+    if (
+      parsedUrl.protocol !== 'https:' ||
+      parsedUrl.hostname !== GITHUB_API_HOSTNAME ||
+      parsedUrl.port !== '' ||
+      parsedUrl.username !== '' ||
+      parsedUrl.password !== ''
+    ) {
+      throw new GithubClientError('GITHUB_UNAVAILABLE', 'Link de paginação inválido na resposta do GitHub.');
+    }
+
+    if (parsedUrl.pathname === expectedLegacyPath) {
+      return { url: rawUrl, numericUserId: lockedNumericUserId };
+    }
+
+    const numericMatch = parsedUrl.pathname.match(NUMERIC_USER_REPOS_PATH);
+    if (numericMatch) {
+      const numericUserId = numericMatch[1];
+      if (lockedNumericUserId !== null && numericUserId !== lockedNumericUserId) {
+        throw new GithubClientError('GITHUB_UNAVAILABLE', 'Link de paginação inválido na resposta do GitHub.');
+      }
+      return { url: rawUrl, numericUserId };
+    }
+
+    throw new GithubClientError('GITHUB_UNAVAILABLE', 'Link de paginação inválido na resposta do GitHub.');
+  }
+
+  return null;
+}
+
+export async function fetchGithubRepos(
+  username: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<GithubRepo[]> {
+  const repos: GithubRepo[] = [];
+  const visitedUrls = new Set<string>();
+  let nextUrl: string | null = `${GITHUB_API_BASE_URL}/users/${username}/repos?per_page=100&type=all`;
+  let lockedNumericUserId: string | null = null;
+
+  while (nextUrl !== null) {
+    if (visitedUrls.has(nextUrl)) {
+      throw new GithubClientError('GITHUB_UNAVAILABLE', 'Paginação inválida da API do GitHub.');
+    }
+    visitedUrls.add(nextUrl);
+
+    let response: Response;
+    try {
+      response = await fetchImpl(nextUrl, { headers: buildRequestHeaders() });
+    } catch {
+      throw new GithubClientError('GITHUB_UNAVAILABLE', 'Falha de rede ao consultar a API do GitHub.');
+    }
+
+    const parsedBody = await parseJsonBody(response);
+    if (!parsedBody.ok || !isGithubRepoArray(parsedBody.value)) {
+      throw new GithubClientError('GITHUB_UNAVAILABLE', 'Resposta inválida da API do GitHub.');
+    }
+
+    repos.push(...parsedBody.value);
+    const next = parseNextLinkUrl(response.headers.get('link'), username, lockedNumericUserId);
+    nextUrl = next?.url ?? null;
+    lockedNumericUserId = next?.numericUserId ?? lockedNumericUserId;
+  }
+
+  return repos;
 }
