@@ -122,5 +122,5 @@ Versões consultadas no registro npm durante o planejamento; gravar versões exa
 
 ---
 **Status:** [] Rascunho — [x] Aprovado pelo usuário em [data]
-**Última tarefa concluída:** 6 — Projetar timeline e resumo anual
+**Última tarefa concluída:** 7 — Expor rota HTTP, erros e CORS
 > Atualizar apenas após cada tarefa verificada e integrada; isso orienta o handoff entre Claude Code → Kimi Code → Hermes.
