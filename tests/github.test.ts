@@ -416,3 +416,189 @@ test('rejeita Link rel="next" que troca de id numérico entre páginas sem entra
   );
   assert.equal(calledUrls.length, 2);
 });
+
+// Tarefa 5: filtrar privados preservando forks/próprios e descrição nula (CA-3);
+// falhas na paginação de /users/:username/repos, na primeira ou na segunda página,
+// não geram sucesso parcial e seguem a mesma classificação de fetchGithubUser (CA-9),
+// exceto que 404 aqui NUNCA vira USER_NOT_FOUND (o perfil já foi confirmado antes).
+
+test('filtra repositórios privados preservando próprios, forks públicos e descrição nula', async () => {
+  const ownRepo = makeRepo({ id: 1, name: 'own-repo', description: 'Meu projeto', fork: false, private: false });
+  const forkRepo = makeRepo({ id: 2, name: 'fork-repo', description: null, fork: true, private: false });
+  const privateRepo = makeRepo({ id: 3, name: 'private-repo', description: 'Segredo', fork: false, private: true });
+
+  const fetchStub: typeof fetch = async () => reposResponse([ownRepo, forkRepo, privateRepo]);
+
+  const repos = await fetchGithubRepos('octocat', fetchStub);
+
+  assert.deepEqual(repos.map((repo) => repo.name), ['own-repo', 'fork-repo']);
+  assert.equal(repos.some((repo) => repo.private), false);
+  const fork = repos.find((repo) => repo.name === 'fork-repo');
+  assert.equal(fork?.description, null);
+});
+
+test('rejeita com GITHUB_RATE_LIMITED quando a primeira página retorna 429', async () => {
+  const fetchStub: typeof fetch = async () => jsonResponse({ message: 'API rate limit exceeded' }, { status: 429 });
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_RATE_LIMITED',
+  );
+});
+
+test('rejeita com GITHUB_RATE_LIMITED quando a primeira página retorna 403 identificável como limite', async () => {
+  const fetchStub: typeof fetch = async () =>
+    jsonResponse({ message: 'API rate limit exceeded' }, { status: 403, headers: { 'x-ratelimit-remaining': '0' } });
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_RATE_LIMITED',
+  );
+});
+
+test('rejeita com GITHUB_UNAVAILABLE quando a primeira página retorna outro 403 (não relacionado a limite)', async () => {
+  const fetchStub: typeof fetch = async () =>
+    jsonResponse({ message: 'Forbidden' }, { status: 403, headers: { 'x-ratelimit-remaining': '10' } });
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_UNAVAILABLE',
+  );
+});
+
+test('rejeita com GITHUB_UNAVAILABLE quando a primeira página retorna 5xx', async () => {
+  const fetchStub: typeof fetch = async () => jsonResponse({ message: 'Internal Server Error' }, { status: 500 });
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_UNAVAILABLE',
+  );
+});
+
+test('rejeita com GITHUB_UNAVAILABLE quando a primeira página falha por erro de rede', async () => {
+  const fetchStub: typeof fetch = async () => {
+    throw new TypeError('fetch failed');
+  };
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_UNAVAILABLE',
+  );
+});
+
+test('rejeita com GITHUB_UNAVAILABLE quando a primeira página retorna payload inválido (não é array)', async () => {
+  const fetchStub: typeof fetch = async () => jsonResponse({ not: 'an-array' }, { status: 200 });
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_UNAVAILABLE',
+  );
+});
+
+test('404 na página de repositórios não vira USER_NOT_FOUND (perfil já foi buscado); resulta em GITHUB_UNAVAILABLE', async () => {
+  const fetchStub: typeof fetch = async () => jsonResponse({ message: 'Not Found' }, { status: 404 });
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_UNAVAILABLE',
+  );
+});
+
+test('rejeita com GITHUB_RATE_LIMITED quando a SEGUNDA página retorna 429, sem repositório parcial da primeira página', async () => {
+  const page1 = [makeRepo({ id: 1, name: 'repo-a' })];
+  const nextUrl = 'https://api.github.com/users/octocat/repos?per_page=100&type=all&page=2';
+  const fetchStub: typeof fetch = async (url) => {
+    if (url === nextUrl) {
+      return jsonResponse({ message: 'API rate limit exceeded' }, { status: 429 });
+    }
+    return reposResponse(page1, { linkHeader: `<${nextUrl}>; rel="next"` });
+  };
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_RATE_LIMITED',
+  );
+});
+
+test('rejeita com GITHUB_RATE_LIMITED quando a SEGUNDA página retorna 403 identificável como limite', async () => {
+  const page1 = [makeRepo({ id: 1, name: 'repo-a' })];
+  const nextUrl = 'https://api.github.com/users/octocat/repos?per_page=100&type=all&page=2';
+  const fetchStub: typeof fetch = async (url) => {
+    if (url === nextUrl) {
+      return jsonResponse(
+        { message: 'API rate limit exceeded' },
+        { status: 403, headers: { 'x-ratelimit-remaining': '0' } },
+      );
+    }
+    return reposResponse(page1, { linkHeader: `<${nextUrl}>; rel="next"` });
+  };
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_RATE_LIMITED',
+  );
+});
+
+test('rejeita com GITHUB_UNAVAILABLE quando a SEGUNDA página retorna outro 403 (não relacionado a limite)', async () => {
+  const page1 = [makeRepo({ id: 1, name: 'repo-a' })];
+  const nextUrl = 'https://api.github.com/users/octocat/repos?per_page=100&type=all&page=2';
+  const fetchStub: typeof fetch = async (url) => {
+    if (url === nextUrl) {
+      return jsonResponse({ message: 'Forbidden' }, { status: 403, headers: { 'x-ratelimit-remaining': '10' } });
+    }
+    return reposResponse(page1, { linkHeader: `<${nextUrl}>; rel="next"` });
+  };
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_UNAVAILABLE',
+  );
+});
+
+test('rejeita com GITHUB_UNAVAILABLE quando a SEGUNDA página retorna 5xx', async () => {
+  const page1 = [makeRepo({ id: 1, name: 'repo-a' })];
+  const nextUrl = 'https://api.github.com/users/octocat/repos?per_page=100&type=all&page=2';
+  const fetchStub: typeof fetch = async (url) => {
+    if (url === nextUrl) {
+      return jsonResponse({ message: 'Internal Server Error' }, { status: 500 });
+    }
+    return reposResponse(page1, { linkHeader: `<${nextUrl}>; rel="next"` });
+  };
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_UNAVAILABLE',
+  );
+});
+
+test('rejeita com GITHUB_UNAVAILABLE quando a SEGUNDA página falha por erro de rede', async () => {
+  const page1 = [makeRepo({ id: 1, name: 'repo-a' })];
+  const nextUrl = 'https://api.github.com/users/octocat/repos?per_page=100&type=all&page=2';
+  const fetchStub: typeof fetch = async (url) => {
+    if (url === nextUrl) {
+      throw new TypeError('fetch failed');
+    }
+    return reposResponse(page1, { linkHeader: `<${nextUrl}>; rel="next"` });
+  };
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_UNAVAILABLE',
+  );
+});
+
+test('rejeita com GITHUB_UNAVAILABLE quando a SEGUNDA página retorna payload inválido (não é array)', async () => {
+  const page1 = [makeRepo({ id: 1, name: 'repo-a' })];
+  const nextUrl = 'https://api.github.com/users/octocat/repos?per_page=100&type=all&page=2';
+  const fetchStub: typeof fetch = async (url) => {
+    if (url === nextUrl) {
+      return jsonResponse({ not: 'an-array' }, { status: 200 });
+    }
+    return reposResponse(page1, { linkHeader: `<${nextUrl}>; rel="next"` });
+  };
+
+  await assert.rejects(
+    () => fetchGithubRepos('octocat', fetchStub),
+    (error: unknown) => error instanceof GithubClientError && error.code === 'GITHUB_UNAVAILABLE',
+  );
+});

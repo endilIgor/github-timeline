@@ -149,6 +149,25 @@ function isGithubRepoArray(body: unknown): body is GithubRepo[] {
   return Array.isArray(body) && body.every(isGithubRepo);
 }
 
+async function classifyRepoPageFailure(response: Response): Promise<GithubClientError> {
+  if (response.status === 429) {
+    return new GithubClientError('GITHUB_RATE_LIMITED', 'Limite de requisições do GitHub atingido.');
+  }
+
+  if (response.status === 403) {
+    if (isRateLimitedForbidden(response) || isSecondaryRateLimitForbidden(response)) {
+      return new GithubClientError('GITHUB_RATE_LIMITED', 'Limite de requisições do GitHub atingido.');
+    }
+
+    const parsed = await parseJsonBody(response);
+    if (parsed.ok && hasRateLimitMessage(parsed.value)) {
+      return new GithubClientError('GITHUB_RATE_LIMITED', 'Limite de requisições do GitHub atingido.');
+    }
+  }
+
+  return new GithubClientError('GITHUB_UNAVAILABLE', 'Falha ao consultar a API do GitHub.');
+}
+
 const NUMERIC_USER_REPOS_PATH = /^\/user\/(\d+)\/repos$/;
 
 interface NextLink {
@@ -228,12 +247,16 @@ export async function fetchGithubRepos(
       throw new GithubClientError('GITHUB_UNAVAILABLE', 'Falha de rede ao consultar a API do GitHub.');
     }
 
+    if (!response.ok) {
+      throw await classifyRepoPageFailure(response);
+    }
+
     const parsedBody = await parseJsonBody(response);
     if (!parsedBody.ok || !isGithubRepoArray(parsedBody.value)) {
       throw new GithubClientError('GITHUB_UNAVAILABLE', 'Resposta inválida da API do GitHub.');
     }
 
-    repos.push(...parsedBody.value);
+    repos.push(...parsedBody.value.filter((repo) => !repo.private));
     const next = parseNextLinkUrl(response.headers.get('link'), username, lockedNumericUserId);
     nextUrl = next?.url ?? null;
     lockedNumericUserId = next?.numericUserId ?? lockedNumericUserId;
