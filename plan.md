@@ -122,5 +122,5 @@ Versões consultadas no registro npm durante o planejamento; gravar versões exa
 
 ---
 **Status:** [] Rascunho — [x] Aprovado pelo usuário em [data]
-**Última tarefa concluída:** 5 — Restringir a repositórios públicos sem perder forks
+**Última tarefa concluída:** 6 — Projetar timeline e resumo anual
 > Atualizar apenas após cada tarefa verificada e integrada; isso orienta o handoff entre Claude Code → Kimi Code → Hermes.
