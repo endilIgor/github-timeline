@@ -122,5 +122,5 @@ Versões consultadas no registro npm durante o planejamento; gravar versões exa
 
 ---
 **Status:** [] Rascunho — [x] Aprovado pelo usuário em [data]
-**Última tarefa concluída:** nenhuma
+**Última tarefa concluída:** 1 — Preparar ferramentas e verificação de fundação
 > Atualizar apenas após cada tarefa verificada e integrada; isso orienta o handoff entre Claude Code → Kimi Code → Hermes.
