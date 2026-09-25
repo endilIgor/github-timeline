@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitHub Timeline — repositórios públicos em ordem cronológica</title>
+<meta name="description" content="Informe um usuário do GitHub e veja todos os repositórios públicos em ordem cronológica, com contagem por ano.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="/styles.css">
+<script type="module" src="/app.js"></script>
+</head>
+<body>
+<!-- Shell da interface (Tarefa 9). Conteúdo dinâmico é preenchido por /app.js (Tarefa 10) a partir de /api/timeline/:username. -->
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
+<div class="progress" id="read-progress" aria-hidden="true"></div>
+
+<nav class="nav" aria-label="Navegação principal">
+  <div class="nav__inner">
+    <a class="brand" href="#top" aria-label="timeline.gh — início">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span class="brand__name">timeline<span class="muted">.gh</span></span>
+    </a>
+    <ul class="nav__links">
+      <li><a href="#anos">Anos</a></li>
+      <li><a href="#timeline">Timeline</a></li>
+      <li><a href="#api">API</a></li>
+      <li><a class="nav__repo" href="https://github.com/endilIgor/github-timeline" target="_blank" rel="noopener noreferrer">Repo <span aria-hidden="true">↗</span></a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="conteudo">
+  <header id="top" class="hero">
+    <div class="hero__copy">
+      <p class="eyebrow mono"><span>GET /api/timeline/:username</span><span class="dim" aria-hidden="true">—</span><span class="muted">v1.0</span></p>
+      <h1 class="hero__title">Cada repositório, um ponto na trajetória.</h1>
+      <p class="hero__lead">Informe um usuário do GitHub. Todos os repositórios públicos — próprios e forks — são dispostos em ordem cronológica, do mais antigo ao mais recente.</p>
+
+      <form class="lookup" id="timeline-form" action="#" method="get" novalidate>
+        <label class="visually-hidden" for="username">Usuário do GitHub</label>
+        <div class="lookup__field">
+          <span class="lookup__prefix mono" aria-hidden="true">github.com/</span>
+          <input class="lookup__input mono" id="username" name="username" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="39" placeholder="username" aria-describedby="username-hint" required>
+          <button class="lookup__submit" type="submit" id="submit-button">Gerar timeline</button>
+        </div>
+        <p class="visually-hidden" id="username-hint">Letras, números e hífens, até 39 caracteres, sem espaço ou @.</p>
+        <ol class="request-log mono" id="request-log" aria-label="Requisições à API local"></ol>
+        <p class="visually-hidden" id="status" role="status" aria-live="polite"></p>
+      </form>
+
+      <div class="alert" id="error" role="alert" hidden>
+        <p class="alert__code mono" id="error-code"></p>
+        <p class="alert__message" id="error-message"></p>
+        <p class="alert__hint" id="error-hint"></p>
+      </div>
+    </div>
+
+    <div class="hero__visual" aria-hidden="true">
+      <svg class="hero__mark" viewBox="0 0 16 16" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      <canvas class="hero__canvas" id="hero-canvas" aria-hidden="true"></canvas>
+      <p class="hero__caption mono"><span class="accent">▲</span><span id="canvas-caption">aguardando usuário</span></p>
+    </div>
+  </header>
+
+  <div class="results" id="results" data-state="idle">
+    <section class="block summary" id="resumo" aria-labelledby="profile-username">
+      <div class="summary__head">
+        <h2 class="summary__user" id="profile-username">@—</h2>
+        <p class="summary__range mono"><span id="range-label">—</span></p>
+      </div>
+      <dl class="stats">
+        <div class="stat"><dt class="stat__label">Repositórios públicos</dt><dd class="stat__value" id="stat-total">—</dd></div>
+        <div class="stat"><dt class="stat__label">Originais</dt><dd class="stat__value" id="stat-originals">—</dd></div>
+        <div class="stat"><dt class="stat__label">Forks</dt><dd class="stat__value" id="stat-forks">—</dd></div>
+        <div class="stat"><dt class="stat__label">Anos ativos</dt><dd class="stat__value" id="stat-years">—</dd></div>
+      </dl>
+    </section>
+
+    <section class="block years" id="anos" aria-labelledby="anos-title">
+      <div class="years__grid">
+        <div class="section-intro">
+          <p class="kicker">summaryByYear</p>
+          <h2 class="section-title" id="anos-title">Ritmo de criação, ano a ano.</h2>
+          <p class="section-lead">Cada repositório conta uma vez no ano UTC em que foi criado. Clique em um ano para saltar até ele.</p>
+        </div>
+        <div class="chart" id="year-chart" role="group" aria-label="Repositórios criados por ano"><p class="placeholder mono">Consulte um usuário para ver a contagem anual.</p></div>
+      </div>
+    </section>
+
+    <section class="block timeline" id="timeline" aria-labelledby="timeline-title">
+      <div class="timeline__head">
+        <h2 class="timeline__title" id="timeline-title">Timeline</h2>
+        <p class="timeline__order mono" id="order-label">mais antigos primeiro</p>
+      </div>
+      <div class="timeline__groups" id="timeline-groups"></div>
+      <p class="placeholder mono" id="timeline-idle">Nenhuma consulta ainda. A timeline aparece aqui com os dados reais da API.</p>
+      <div class="empty" id="timeline-empty" hidden>
+        <p class="empty__code mono">200 · total: 0</p>
+        <p class="empty__message">Nenhum repositório público ainda.</p>
+      </div>
+    </section>
+  </div>
+
+  <section class="block api" id="api" aria-labelledby="api-title">
+    <div class="api__grid">
+      <div class="section-intro">
+        <p class="kicker">Contrato</p>
+        <h2 class="section-title section-title--sm" id="api-title">Sem cache, sem banco. Cada consulta é nova.</h2>
+        <p class="section-lead">A API consulta o GitHub a cada requisição, sem token. Organizações não são suportadas; forks públicos entram na contagem.</p>
+      </div>
+      <div class="api__detail mono">
+        <pre class="api__schema" aria-label="Formato da resposta JSON"><code>GET /api/timeline/:username → 200
+{
+  "username": string,
+  "total": number,
+  "repositories": [{
+    "name": string,
+    "description": string | null,
+    "createdAt": string (ISO 8601),
+    "url": string,
+    "isFork": boolean
+  }],
+  "summaryByYear": [{ "year": number, "count": number }]
+}</code></pre>
+        <table class="errors">
+          <caption class="visually-hidden">Códigos de erro da API</caption>
+          <thead class="visually-hidden"><tr><th scope="col">HTTP</th><th scope="col">Código e situação</th></tr></thead>
+          <tbody>
+            <tr><td class="errors__http">400</td><td><span class="errors__code">INVALID_USERNAME</span><span class="errors__when">Nome de usuário inválido.</span></td></tr>
+            <tr><td class="errors__http">404</td><td><span class="errors__code">USER_NOT_FOUND</span><span class="errors__when">Conta GitHub não encontrada.</span></td></tr>
+            <tr><td class="errors__http">422</td><td><span class="errors__code">ORGANIZATION_NOT_SUPPORTED</span><span class="errors__when">Contas de organização não são suportadas.</span></td></tr>
+            <tr><td class="errors__http">429</td><td><span class="errors__code">GITHUB_RATE_LIMITED</span><span class="errors__when">Limite de requisições do GitHub atingido.</span></td></tr>
+            <tr><td class="errors__http">502</td><td><span class="errors__code">GITHUB_UNAVAILABLE</span><span class="errors__when">Falha ao consultar a API do GitHub.</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer mono">
+  <span>github-timeline · TypeScript + Hono</span>
+  <span>dados: api.github.com (público, não autenticado)</span>
+</footer>
+</body>
+</html>

@@ -149,5 +149,5 @@ Não instalar dependências npm; se uma biblioteca de browser for inevitável, p
 
 ---
 **Status:** [] Rascunho — [x] Aprovado pelo usuário em [data]
-**Última tarefa concluída:** 8 — Inicialização local e documentação de teste
+**Última tarefa concluída:** 11 — Movimento progressivo e verificação operacional
 > Atualizar apenas após cada tarefa verificada e integrada; isso orienta o handoff entre Claude Code → Kimi Code → Hermes.
