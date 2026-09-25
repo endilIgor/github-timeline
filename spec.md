@@ -1,4 +1,4 @@
-# Spec — GitHub Timeline (back-end)
+# Spec — GitHub Timeline (API e interface local)
 
 > Preenchido pelo Hermes (fase DISCUSSÃO → SPEC), a partir das decisões confirmadas pelo usuário. Este arquivo é a fonte da verdade sobre O QUÊ será construído. Nenhum agente de código implementa nada que não esteja aqui.
 
@@ -8,7 +8,7 @@ Disponibilizar uma API local que transforme os repositórios públicos de uma co
 
 ## 2. Contexto e motivação
 
-O futuro front-end precisará mostrar a um potencial empregador os projetos públicos de um usuário, com nome, data de criação e descrição, além de uma contagem por ano. Nesta etapa haverá somente o back-end; os dados serão consultados diretamente na API pública do GitHub em cada requisição, sem persistência.
+O front-end mostra a um potencial empregador os projetos públicos de um usuário, com nome, data de criação e descrição, além de uma contagem por ano. A fase 1 entregou somente o back-end; na fase 2, autorizada pelo usuário, a interface usa essa API local. O servidor continua consultando a API pública do GitHub em cada requisição, sem persistência.
 
 ## 3. User stories
 
@@ -44,7 +44,7 @@ O futuro front-end precisará mostrar a um potencial empregador os projetos púb
 
 ## 6. FORA DO ESCOPO (não implementar)
 
-- Front-end, formulário, botão “Generate”, desenho gráfico da timeline, cores e tipografia.
+- Front-end fora do escopo apenas da fase 1 (Tarefas 1–8); a fase 2 abaixo substitui essa restrição.
 - Banco de dados, Docker, cache, snapshots, sincronização e chamadas autenticadas ao GitHub.
 - Suporte a organizações, repositórios privados, métricas de commits/estrelas/contribuições ou filtros adicionais.
 - Deploy e adaptação ao Cloudflare Workers nesta versão; TypeScript/Hono foram escolhidos visando uma possível migração posterior, sem promessa de compatibilidade imediata.
@@ -72,4 +72,26 @@ O futuro front-end precisará mostrar a um potencial empregador os projetos púb
 
 ---
 **Status:** [] Rascunho — [x] Aprovada pelo usuário em [data]
-**Versão:** 1.0
+**Versão:** 1.1 — fase 2 autorizada pelo usuário para implementar o projeto Claude Design.
+
+## 9. Fase 2 — Interface Claude Design (aprovada pelo usuário após a fase 1)
+
+Fonte visual e de interação: projeto `https://claude.ai/design/p/2ea93c78-b171-4878-badc-1ef988982708?file=GitHub+Timeline.dc.html`, arquivos `GitHub Timeline.dc.html` e `support.js` exportados em `/tmp/github-timeline-design-export/`. O primeiro é o protótipo de layout/lógica; o segundo é o runtime gerado pelo Claude Design, referência de interpretação, não uma dependência do produto. Não copiar o runtime gerado nem carregar React por CDN; implementar o resultado no app local com tecnologias nativas e dependências existentes.
+
+- **US-5:** Como visitante, quero abrir a interface na raiz do mesmo servidor da API, informar um login e ver a timeline sem configuração de CORS.
+- **US-6:** Como visitante, quero ver resumo, contagem anual, lista com data, descrição e indicação de fork, com navegação de ano e links para o GitHub.
+- **US-7:** Como visitante, quero perceber carregamento, falhas e conta sem projetos sem que dados fictícios sejam apresentados como reais.
+
+### Critérios de aceite da fase 2
+
+- **CA-12** (US-5): `GET /` serve HTML da interface; CSS e JS próprios são servidos pelo mesmo servidor após `npm run build && npm start`, sem afetar `/api/timeline/:username`. A página responde em layout adaptável a telas estreitas e usa a direção visual do design: fundo preto, tipografia Geist com fallback, roxo `#8052ff`, amarelo `#ffb829`, cabeçalho, formulário, gráfico anual, timeline e seção explicativa da API.
+- **CA-13** (US-5, US-7): O formulário pede um login, consulta exclusivamente `/api/timeline/:username` na mesma origem, usa o JSON contratado na seção 4 e não faz `fetch` diretamente ao GitHub nem carrega resultados estáticos como resposta real. Login inválido, HTTP 404/422/429/502, falha de rede e JSON inesperado apresentam avisos visíveis, sem alterar a semântica de erro da API; carregar outro usuário remove o erro anterior.
+- **CA-14** (US-6): Após HTTP 200, a interface exibe `username`, total de públicos, originais/forks, anos ativos e todos os `repositories` agrupados pelo ano UTC de `createdAt` na ordem devolvida pela API, inclusive descrições nulas e lista vazia. Cada link abre a URL do repositório em outra aba com `rel="noopener noreferrer"`; nome/descrição do GitHub entram como texto, nunca HTML executável.
+- **CA-15** (US-6): O gráfico anual representa `summaryByYear`; clicar em um ano salta para o grupo correspondente, inclusive com muitos anos. A interface mantém navegação por teclado, rótulo de formulário e estados anunciáveis para leitores de tela. A animação decorativa de partículas inspirada no design não impede a leitura/uso sem canvas e respeita `prefers-reduced-motion`.
+- **CA-16** (US-7): Durante uma consulta, o formulário indica carregamento e impede envio duplicado; respostas de consultas anteriores não substituem a mais recente. Erro não é mascarado por dados demonstrativos; se houver demonstração, deve ser iniciada explicitamente e identificada como fictícia.
+
+### Limites da fase 2
+
+- API existente, payload e classificações HTTP não mudam. Não acrescentar endpoints externos, token, banco, cache, Docker, deploy ou dependência npm sem aprovação explícita.
+- O protótipo buscava `api.github.com` diretamente e ativava demonstração automaticamente quando a consulta inicial falhava. Estes detalhes **não** são copiados: a API local permanece fonte única e erros reais são visíveis. Dados de demonstração só são admissíveis com ação explícita e rótulo de ficção.
+- Arquivos exportados em `/tmp` são referência, não artefatos de runtime nem arquivos a serem commitados. Testes não devem depender de acesso ao Claude Design ou à rede GitHub.

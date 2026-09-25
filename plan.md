@@ -1,4 +1,4 @@
-# Plan — GitHub Timeline (back-end)
+# Plan — GitHub Timeline (API e interface local)
 
 > Preenchido pelo Hermes (fase PLANO), baseado na `spec.md` aprovada. Este arquivo é a fonte da verdade sobre COMO será construído. Claude Code e Kimi Code executam UMA tarefa por vez, na ordem, somente após aprovação deste plano. Os exemplos de dados nos testes não são respostas reais da API.
 
@@ -53,7 +53,7 @@ Versões consultadas no registro npm durante o planejamento; gravar versões exa
 
 ## 6. Tarefas (executar na ordem, UMA por vez)
 
-> Cada tarefa inclui arquivos de teste, mudança, critério e comando. Fluxo obrigatório: escrever um teste que falhe pelo motivo esperado (RED), registrar a saída; implementação mínima (GREEN), registrar a saída do teste e de `npm test`; rodar `npm run typecheck` quando houver fontes `.ts`. Não alterar assertions para obter GREEN. A exceção de escopo é atualizar somente o campo **Última tarefa concluída** em `plan.md` depois de validar a tarefa. Commits lógicos individuais, sem assinatura de IA, após revisão/validação.
+> Cada tarefa inclui arquivos de teste, mudança, critério e comando. Fluxo obrigatório: escrever um teste que falhe pelo motivo esperado (RED), registrar a saída; implementação mínima (GREEN), registrar a saída do teste e de `npm test`; rodar `npm run typecheck` quando houver fontes `.ts`. Não alterar assertions para obter GREEN. A exceção de escopo é atualizar somente o campo **Última tarefa concluída** em `plan.md` depois de validar a tarefa. Na fase 1 houve commits lógicos individuais após revisão; na fase 2, não commitar sem pedido explícito do usuário.
 
 ### Tarefa 1 — Preparar ferramentas e verificação de fundação
 - **Arquivo(s):** `tests/setup.test.mjs`, `package.json`, `package-lock.json`, `tsconfig.json`, `tsconfig.build.json`, `.gitignore`.
@@ -110,6 +110,33 @@ Versões consultadas no registro npm durante o planejamento; gravar versões exa
 - **RED:** `npx tsx --test tests/server.test.ts` falha no teste de startup HTTP antes de criar `src/server.ts`.
 - **Teste/verificação GREEN:** comando focado, `npm test`, `npm run typecheck` e `npm run build` passam; executar smoke local com `npm start` e `curl -i http://127.0.0.1:3000/api/timeline/%40` → 400. Fazer leitura real com usuário público conhecido se a API GitHub estiver disponível; aceitar 429 explícito se limite esgotado, sem fingir 200. Encerrar servidor e conferir status do Git.
 - **Critérios de aceite cobertos:** CA-1, CA-7 e validação operacional do conjunto.
+
+## 6.1 Fase 2 — Implementar o Claude Design na mesma origem
+
+O usuário autorizou expressamente a ampliação de escopo depois de concluir as Tarefas 1–8. A fonte visual é `GitHub Timeline.dc.html` e seu import `support.js` no projeto Claude Design registrado na seção 9 da spec; cópias de referência verificadas estão em `/tmp/github-timeline-design-export/`. O HTML do protótipo não é copiável como página comum (`x-dc` e runtime gerado), portanto a interface final usa HTML/CSS/JS nativos sem dependências novas. Não copiar os `fetch` diretos ao GitHub nem o fallback automático de demonstração: a única fonte de dados reais é a API Hono existente na mesma origem. A resposta da API não muda. Os arquivos estáticos ficam em `public/` e são lidos pelo servidor ao executar da raiz do projeto; `npm run build` continua compilando o TypeScript e `npm start` serve também os assets em `public/` (sem etapa extra de cópia).
+
+### Tarefa 9 — Servir a página e a identidade visual
+- **Arquivo(s):** `src/app.ts`, `tests/web.test.ts`, `public/index.html`, `public/styles.css`.
+- **Mudança:** criar página sem dependência de runtime Claude Design, com navegação, hero/formulário acessível, espaço para canvas, resumo anual, timeline, explicação da API e rodapé inspirados no protótipo; CSS responsivo, paleta/tipografia e fallbacks. Servir `GET /`, `/styles.css` e, inicialmente, deixar preparado `/app.js` (rota adicionada na Tarefa 10), sem modificar os endpoints `/api/*`. Nenhum dado fictício como resposta real.
+- **RED:** `npx tsx --test tests/web.test.ts` falha porque a raiz e o CSS ainda não são servidos, com assertions do conteúdo e contrato da API preservado.
+- **GREEN:** teste focado, `npm test`, `npm run typecheck` e `npm run build` passam.
+- **Aceite:** CA-12 (estrutura e identidade visual); CA-13/14/15 recebem comportamento nas tarefas seguintes.
+
+### Tarefa 10 — Consultar API e renderizar timeline
+- **Arquivo(s):** `public/app.js`, `public/index.html`, `public/styles.css`, `src/app.ts`, `tests/web.test.ts`, `tests/frontend.test.mjs`.
+- **Mudança:** consulta apenas `/api/timeline/:username` com validação no formulário, estados loading/erro/sucesso/vazio, proteção contra resposta atrasada, visualização total/originais/forks, barras e grupos anuais a partir do JSON, links seguros e texto não interpretado como HTML; salto ao ano, demonstração somente por ação explícita se mantida. Servir o JS estático e evitar que uma rota estática capture `/api/*`.
+- **RED:** `node --test tests/frontend.test.mjs` falha por comportamento ausente de consulta/agrupamento/erro/concorrência; teste HTTP para JS falha antes da rota. Erro de importação isolado não é RED suficiente: incluir assertions funcionais que falham por ausência da função esperada e depois passam.
+- **GREEN:** testes focados `node --test tests/frontend.test.mjs` e `npx tsx --test tests/web.test.ts`, `npm test`, `npm run typecheck`, `npm run build` passam.
+- **Aceite:** CA-12 (JS servido), CA-13, CA-14, CA-15 (barras/salto), CA-16.
+
+### Tarefa 11 — Movimento progressivo e verificação operacional
+- **Arquivo(s):** `public/app.js`, `public/styles.css`, `public/index.html`, `tests/frontend.test.mjs`, `README.md`.
+- **Mudança:** desenho decorativo inspirado na marca GitHub em canvas (sem bloquear o conteúdo), progresso de leitura, microinterações e respeito a `prefers-reduced-motion`; documentar a interface e smoke após build. Manter a página útil quando o canvas não existe ou os recursos de animação são indisponíveis.
+- **RED:** teste focado em `node --test tests/frontend.test.mjs` para suporte progressivo/reduced motion falha pelo comportamento ausente; não aceitar falha de sintaxe/ambiente.
+- **GREEN:** teste focado, `npm test`, `npm run typecheck`, `npm run build` e smoke real de `/`, `/styles.css`, `/app.js`, API 400 e consulta pública (ou erro explícito) passam; encerrar o servidor e conferir que não restou processo.
+- **Aceite:** CA-12, CA-15 e validação integrada CA-13/14/16.
+
+Não instalar dependências npm; se uma biblioteca de browser for inevitável, parar e pedir aprovação. Testes de integração simulam respostas do GitHub por `fetch` injetado, sem usar a rede externa. Quando houver navegador disponível, revisar visualmente e exercitar a consulta real nele, além dos testes funcionais e do smoke HTTP; sem navegador, não afirmar revisão visual. Atualizar só **Última tarefa concluída** ao fim de cada tarefa verificada. Não fazer commit/push sem pedido explícito do usuário.
 
 ## 7. Riscos e pontos de atenção
 

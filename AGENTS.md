@@ -1,13 +1,13 @@
-# AGENTS.md — GitHub Timeline (back-end)
+# AGENTS.md — GitHub Timeline (API e interface local)
 
 > Claude Code, Kimi Code ou outro agente de código: leia este arquivo, `spec.md` e `plan.md` antes de codar. Este arquivo adapta o modelo de `/root/projects/spec-driven-templates/templates/AGENTS.md` ao projeto. Se uma instrução posterior do usuário contradisser estes documentos, pare e peça alinhamento; não presuma que este arquivo prevalece.
 
 ## Fluxo obrigatório
 
 1. Leia `spec.md` (o QUÊ) e `plan.md` (o COMO) na raiz.
-2. Implemente somente a tarefa numerada explicitamente pelo usuário/agente coordenador, na ordem do plano. Nenhuma tarefa foi concluída ainda.
+2. Implemente somente a tarefa numerada explicitamente pelo usuário/agente coordenador, na ordem do plano. Tarefas 1–8 já concluídas; a fase 2 (Tarefas 9–11) foi autorizada pelo usuário.
 3. Se não houver número da tarefa, ou se a spec/plano estiverem ausentes, ambíguos ou contraditórios, pare e reporte a dúvida. Em execução autônoma sem resposta disponível, encerre relatando o bloqueio; não decida sozinho.
-4. Não implemente o front-end, Docker, banco, cache, token GitHub ou deploy Cloudflare nesta versão.
+4. Front-end é permitido **somente** nas Tarefas 9–11, seguindo o design exportado e a API local; não implemente Docker, banco, cache, token GitHub ou deploy Cloudflare.
 
 ## TDD estrito (não negociável)
 
@@ -32,9 +32,10 @@
 - Setup: `npm install` (somente na Tarefa 1, para as versões exatas aprovadas no `plan.md`); após existir lockfile: `npm ci`.
 - Testes (tudo): `npm test`.
 - Teste de fundação (Tarefa 1): `node --test tests/setup.test.mjs`.
-- Teste focado (Tarefas 2–8): `npx tsx --test tests/<arquivo>.test.ts`, substituindo `<arquivo>` pelo arquivo citado na tarefa.
+- Teste focado (Tarefas 2–9): `npx tsx --test tests/<arquivo>.test.ts`, substituindo `<arquivo>` pelo arquivo citado na tarefa.
+- Testes focados da interface (Tarefas 10–11): `node --test tests/frontend.test.mjs` e `npx tsx --test tests/web.test.ts`.
 - Tipagem (a partir da Tarefa 2): `npm run typecheck`.
-- Build (Tarefa 8): `npm run build`.
+- Build (a partir da Tarefa 8): `npm run build`.
 - Rodar local (a partir da Tarefa 8): `npm run dev` ou `npm start` depois do build; `PORT` tem padrão 3000.
 - Smoke HTTP (Tarefa 8): `curl -i http://127.0.0.1:3000/api/timeline/%40` deve retornar 400 com erro JSON.
 
@@ -42,7 +43,8 @@
 
 - Código e identificadores em inglês; comentários e documentação em português.
 - Node.js 22+, TypeScript/Hono, API REST GitHub pública sem autenticação; variáveis previstas: `PORT` e `CORS_ORIGINS` (origens separadas por vírgula).
-- Commits curtos em inglês, um commit lógico por tarefa; sem assinatura/Co-Authored-By de IA. O coordenador revisa as mudanças antes da integração.
+- Interface da fase 2 usa o mesmo servidor e chama somente `/api/timeline/:username`; protótipo exportado em `/tmp/github-timeline-design-export/` é referência, não runtime distribuído. Não trocar erros reais por demonstração automática.
+- Se o usuário solicitar commits, curtos em inglês e um por tarefa, sem assinatura/Co-Authored-By de IA. Sem pedido explícito, não commitar nem publicar. O coordenador revisa as mudanças antes de marcar progresso.
 - Não inventar campos de resposta, endpoints ou dependências não previstos na spec/plano.
 
 ## Ao terminar qualquer tarefa
