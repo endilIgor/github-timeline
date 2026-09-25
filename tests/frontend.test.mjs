@@ -92,7 +92,8 @@ const PAGE_IDS = {
   status: 'p', error: 'div', 'error-code': 'p', 'error-message': 'p', 'error-hint': 'p',
   'canvas-caption': 'span', results: 'div', 'profile-username': 'h2', 'range-label': 'span',
   'stat-total': 'dd', 'stat-originals': 'dd', 'stat-forks': 'dd', 'stat-years': 'dd',
-  'year-chart': 'div', 'timeline-groups': 'div', 'timeline-idle': 'p', 'timeline-empty': 'div',
+  'year-chart': 'div', 'year-navigation': 'div', 'year-prev': 'button', 'year-next': 'button',
+  'year-progress': 'span', 'timeline-groups': 'div', 'timeline-idle': 'p', 'timeline-empty': 'div',
 };
 
 function createFakeDocument() {
@@ -447,6 +448,73 @@ test('clicar em um ano rola até o grupo e move o foco, inclusive com muitos ano
   assert.ok(bars[12].classList.contains('is-active'));
   assert.equal(bars[12].getAttribute('aria-pressed'), null, 'botão de salto não é toggle');
   assert.ok(target.classList.contains('is-active'));
+});
+
+test('navegação anual avança nos dois sentidos, acompanha scroll e desativa nos extremos', async () => {
+  const years = Array.from({ length: 15 }, (_, i) => 2010 + i);
+  const data = {
+    username: 'octo', total: years.length,
+    repositories: years.map((year) => ({ name: `r${year}`, description: null, createdAt: `${year}-01-01T00:00:00Z`, url: `https://github.com/octo/r${year}`, isFork: false })),
+    summaryByYear: years.map((year) => ({ year, count: 1 })),
+  };
+  const doc = createFakeDocument();
+  const chart = doc.getElementById('year-chart');
+  chart.clientWidth = 300;
+  chart.scrollWidth = 900;
+  chart.scrollLeft = 0;
+  const moves = [];
+  chart.scrollBy = (options) => { moves.push(options); chart.scrollLeft = Math.max(0, Math.min(600, chart.scrollLeft + options.left)); chart.dispatchEvent(makeEvent('scroll')); };
+  const win = listenerTarget({});
+  const app = ui.createTimelineApp({ document: doc, window: win, fetch: async () => jsonResponse(data), prefersReducedMotion: () => true });
+  await app.load('octo');
+  const $ = (id) => doc.getElementById(id);
+  assert.equal($('year-navigation').hidden, false);
+  assert.equal($('year-prev').disabled, true);
+  assert.equal($('year-next').disabled, false);
+  assert.equal($('year-progress').style.getPropertyValue('--year-position'), '0%');
+  $('year-next').click();
+  assert.deepEqual(moves[0], { left: 240, behavior: 'instant' });
+  assert.equal($('year-prev').disabled, false);
+  assert.equal($('year-progress').style.getPropertyValue('--year-position'), '40%');
+  chart.scrollLeft = 600;
+  chart.dispatchEvent(makeEvent('scroll'));
+  assert.equal($('year-next').disabled, true);
+  assert.equal($('year-progress').style.getPropertyValue('--year-position'), '100%');
+  $('year-prev').click();
+  assert.equal(moves[1].left, -240);
+  chart.scrollWidth = 300;
+  win.fire('resize');
+  assert.equal($('year-navigation').hidden, true, 'sem overflow não há navegação falsa');
+});
+
+test('gráfico vazio remove a navegação e renderização seguinte recalcula o scroll', async () => {
+  const doc = createFakeDocument();
+  const chart = doc.getElementById('year-chart');
+  chart.clientWidth = 200;
+  chart.scrollWidth = 500;
+  let data = SAMPLE;
+  const app = ui.createTimelineApp({ document: doc, fetch: async () => jsonResponse(data) });
+  await app.load('octo');
+  assert.equal(doc.getElementById('year-navigation').hidden, false);
+  data = { username: 'vazio', total: 0, repositories: [], summaryByYear: [] };
+  await app.load('vazio');
+  assert.equal(doc.getElementById('year-navigation').hidden, true);
+  data = SAMPLE;
+  chart.scrollLeft = 0;
+  await app.load('octo');
+  assert.equal(doc.getElementById('year-navigation').hidden, false);
+});
+
+test('controles e trilho do gráfico têm identidade visual e rótulos acessíveis', async () => {
+  const html = await readFile(path.join(rootDir, 'public/index.html'), 'utf8');
+  const css = await readFile(path.join(rootDir, 'public/styles.css'), 'utf8');
+  assert.match(html, /id="year-chart"[^>]*tabindex="0"/);
+  assert.match(html, /id="year-prev"[^>]*aria-label="[^"]+"/);
+  assert.match(html, /id="year-next"[^>]*aria-label="[^"]+"/);
+  assert.match(html, /id="year-progress"[^>]*aria-hidden="true"/);
+  assert.match(css, /\.year-navigation__button[^}]*var\(--purple\)/s);
+  assert.match(css, /\.year-progress__fill[^}]*var\(--yellow\)/s);
+  assert.match(css, /\.chart[^}]*scrollbar-color:/s);
 });
 
 // ---------- Estrutura estática ----------

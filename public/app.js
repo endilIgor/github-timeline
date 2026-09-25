@@ -100,7 +100,7 @@ function formatDate(iso) {
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
-export function createTimelineApp({ document: doc, fetch: fetchImpl, prefersReducedMotion = () => false, motion = null }) {
+export function createTimelineApp({ document: doc, window: win = globalThis.window, fetch: fetchImpl, prefersReducedMotion = () => false, motion = null }) {
   const $ = (id) => doc.getElementById(id);
   const form = $('timeline-form');
   const input = $('username');
@@ -110,6 +110,27 @@ export function createTimelineApp({ document: doc, fetch: fetchImpl, prefersRedu
   let currentRequest = 0;
   let controller = null;
   let loading = false;
+  const chart = $('year-chart');
+  const yearNavigation = $('year-navigation');
+
+  function updateYearNavigation() {
+    const maxScroll = Math.max(0, chart.scrollWidth - chart.clientWidth);
+    const hasYears = chart.children.length > 0 && chart.children[0].tagName === 'BUTTON';
+    const overflow = hasYears && maxScroll > 1;
+    yearNavigation.hidden = !overflow;
+    $('year-prev').disabled = !overflow || chart.scrollLeft <= 1;
+    $('year-next').disabled = !overflow || chart.scrollLeft >= maxScroll - 1;
+    $('year-progress').style.setProperty('--year-position', `${overflow ? Math.round(Math.min(1, Math.max(0, chart.scrollLeft / maxScroll)) * 100) : 0}%`);
+  }
+
+  chart.addEventListener('scroll', updateYearNavigation, { passive: true });
+  win?.addEventListener?.('resize', updateYearNavigation);
+  for (const [id, direction] of [['year-prev', -1], ['year-next', 1]]) {
+    $(id).addEventListener('click', () => chart.scrollBy({
+      left: direction * Math.round(chart.clientWidth * 0.8),
+      behavior: prefersReducedMotion() ? 'instant' : 'smooth',
+    }));
+  }
 
   // Movimento é decorativo (Tarefa 11): qualquer falha dele é ignorada para não bloquear a consulta.
   function notifyMotion(name, ...args) {
@@ -187,7 +208,9 @@ export function createTimelineApp({ document: doc, fetch: fetchImpl, prefersRedu
     $('profile-username').textContent = '@—';
     $('range-label').textContent = '—';
     for (const id of ['stat-total', 'stat-originals', 'stat-forks', 'stat-years']) $(id).textContent = '—';
-    $('year-chart').replaceChildren(el('p', 'placeholder mono', 'Consulte um usuário para ver a contagem anual.'));
+    chart.replaceChildren(el('p', 'placeholder mono', 'Consulte um usuário para ver a contagem anual.'));
+    chart.scrollLeft = 0;
+    updateYearNavigation();
     $('timeline-groups').replaceChildren();
     $('timeline-empty').hidden = true;
     $('timeline-idle').hidden = false;
@@ -206,9 +229,9 @@ export function createTimelineApp({ document: doc, fetch: fetchImpl, prefersRedu
   }
 
   function renderChart(summary) {
-    const chart = $('year-chart');
     if (summary.length === 0) {
       chart.replaceChildren(el('p', 'placeholder mono', 'Nenhum ano com repositórios públicos.'));
+      updateYearNavigation();
       return;
     }
     const max = Math.max(1, ...summary.map((s) => s.count));
@@ -226,6 +249,8 @@ export function createTimelineApp({ document: doc, fetch: fetchImpl, prefersRedu
       return bar;
     });
     chart.replaceChildren(...bars);
+    chart.scrollLeft = 0;
+    updateYearNavigation();
   }
 
   function renderRepo(repo) {

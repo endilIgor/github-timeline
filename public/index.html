@@ -80,11 +80,21 @@
     <section class="block years" id="anos" aria-labelledby="anos-title">
       <div class="years__grid">
         <div class="section-intro">
-          <p class="kicker">summaryByYear</p>
           <h2 class="section-title" id="anos-title">Ritmo de criação, ano a ano.</h2>
-          <p class="section-lead">Cada repositório conta uma vez no ano UTC em que foi criado. Clique em um ano para saltar até ele.</p>
+          <p class="section-lead">Cada repositório conta uma vez no ano em que foi criado. Clique em um ano para saltar até ele.</p>
         </div>
-        <div class="chart" id="year-chart" role="group" aria-label="Repositórios criados por ano"><p class="placeholder mono">Consulte um usuário para ver a contagem anual.</p></div>
+        <div class="year-panel">
+          <p class="year-panel__label mono"><span class="accent">▲</span> Atividade por ano <span class="dim">/ 01</span></p>
+          <div class="chart" id="year-chart" role="group" aria-label="Repositórios criados por ano" tabindex="0"><p class="placeholder mono">Consulte um usuário para ver a contagem anual.</p></div>
+          <div class="year-navigation" id="year-navigation" hidden>
+            <span class="year-navigation__hint mono">Deslize para explorar</span>
+            <span class="year-progress" aria-hidden="true"><span class="year-progress__fill" id="year-progress" aria-hidden="true"></span></span>
+            <div class="year-navigation__actions">
+              <button class="year-navigation__button" id="year-prev" type="button" aria-label="Ver anos anteriores" aria-controls="year-chart">←</button>
+              <button class="year-navigation__button" id="year-next" type="button" aria-label="Ver próximos anos" aria-controls="year-chart">→</button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 

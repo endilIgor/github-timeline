@@ -138,6 +138,13 @@ O usuário autorizou expressamente a ampliação de escopo depois de concluir as
 
 Não instalar dependências npm; se uma biblioteca de browser for inevitável, parar e pedir aprovação. Testes de integração simulam respostas do GitHub por `fetch` injetado, sem usar a rede externa. Quando houver navegador disponível, revisar visualmente e exercitar a consulta real nele, além dos testes funcionais e do smoke HTTP; sem navegador, não afirmar revisão visual. Atualizar só **Última tarefa concluída** ao fim de cada tarefa verificada. Não fazer commit/push sem pedido explícito do usuário.
 
+### Tarefa 12 — Integrar a navegação horizontal do gráfico anual ao design
+- **Arquivo(s):** `public/index.html`, `public/styles.css`, `public/app.js`, `tests/frontend.test.mjs`; `spec.md` e esta seção do plano registram a ampliação de escopo autorizada.
+- **Mudança:** manter as barras/consulta existentes; enquadrar o gráfico em uma área com controles de rolagem anterior/próximo e trilho de posição no estilo editorial preto, roxo e amarelo. Usar scroll nativo horizontal, botões que avançam por uma porção visível, estados nos extremos atualizados em scroll/resize e tratamento da conta vazia. Rótulos e foco por teclado; movimento reduzido usa rolagem instantânea. Preservar a alteração preexistente em `public/index.html`.
+- **RED:** novos testes em `tests/frontend.test.mjs` falham por ausência dos controles/estado/indicador, não por importação/ambiente.
+- **GREEN:** `node --test tests/frontend.test.mjs`, `npm test`, `npm run typecheck`, `npm run build`; smoke HTTP e inspeção visual em desktop e viewport estreita quando navegador disponível.
+- **Aceite:** CA-17 sem regressão em CA-12–16. Sem dependências novas nem alterações da API. Atualizar **Última tarefa concluída** somente após verificação.
+
 ## 7. Riscos e pontos de atenção
 
 - Sem token nem cache, uma consulta usa ao menos chamada de perfil + uma por página; rate limit e falhas de rede são esperados e devem ficar visíveis como 429/502.
@@ -149,5 +156,5 @@ Não instalar dependências npm; se uma biblioteca de browser for inevitável, p
 
 ---
 **Status:** [] Rascunho — [x] Aprovado pelo usuário em [data]
-**Última tarefa concluída:** 11 — Movimento progressivo e verificação operacional
+**Última tarefa concluída:** 12 — Integrar a navegação horizontal do gráfico anual ao design
 > Atualizar apenas após cada tarefa verificada e integrada; isso orienta o handoff entre Claude Code → Kimi Code → Hermes.

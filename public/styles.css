@@ -372,19 +372,42 @@ button { font: inherit; }
   align-items: end;
 }
 .years .section-lead { max-width: 420px; }
+.year-panel {
+  min-width: 0;
+  padding: 22px 22px 16px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: linear-gradient(145deg, #110c1e 0%, var(--surface) 48%, #080808 100%);
+}
+.year-panel__label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 11px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
 .chart {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
-  height: 280px;
+  gap: 14px;
+  height: 240px;
   min-width: 0;
+  margin-top: 18px;
+  padding: 8px 2px 14px;
   overflow-x: auto;
   scrollbar-width: thin;
+  scrollbar-color: var(--purple) var(--track);
+  overscroll-behavior-inline: contain;
 }
+.chart::-webkit-scrollbar { height: 5px; }
+.chart::-webkit-scrollbar-track { background: var(--track); border-radius: 5px; }
+.chart::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 5px; }
 .chart > .placeholder { align-self: center; }
 .bar {
-  flex: 1 0 28px;
-  min-width: 28px;
+  flex: 1 0 36px;
+  min-width: 36px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -413,6 +436,47 @@ button { font: inherit; }
 .bar:hover .bar__count,
 .bar:focus-visible .bar__count,
 .bar.is-active .bar__count { color: var(--yellow); }
+.year-navigation {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+}
+.year-navigation__hint {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.year-progress {
+  flex: 1;
+  min-width: 24px;
+  height: 2px;
+  background: var(--track);
+  border-radius: 2px;
+}
+.year-progress__fill {
+  display: block;
+  width: max(12px, var(--year-position, 0%));
+  height: 100%;
+  background: var(--yellow);
+  border-radius: inherit;
+  transition: width .2s var(--ease);
+}
+.year-navigation__actions { display: flex; gap: 6px; }
+.year-navigation__button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--purple);
+  border-radius: 50%;
+  background: rgba(128, 82, 255, .13);
+  color: var(--text);
+  cursor: pointer;
+  transition: background .2s, border-color .2s, color .2s;
+}
+.year-navigation__button:hover:not(:disabled) { background: var(--purple); border-color: var(--purple); }
+.year-navigation__button:disabled { border-color: var(--line); background: transparent; color: var(--dim); cursor: default; }
 
 /* Timeline */
 .timeline { display: flex; flex-direction: column; gap: 96px; }
@@ -556,7 +620,9 @@ a.repo:focus-visible .repo__cta { color: var(--yellow); }
   .lookup__submit { flex: 1 1 100%; }
   .request-log { padding-left: 18px; }
   .block { padding-top: 48px; padding-bottom: 72px; }
+  .year-panel { padding: 18px 16px 14px; }
   .chart { height: 220px; }
+  .year-navigation__hint { display: none; }
   .timeline, .timeline__groups { gap: 60px; }
   .year-group__head { position: static; }
   .repo { gap: 18px; padding-right: 12px; }
